@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Quiz</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d1117; color:#e0e0e0; font-family:'Inter',-apple-system,sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; }
+
+/* ── HEADER ── */
+#header { width:100%; background:rgba(255,255,255,0.03); border-bottom:1px solid rgba(255,255,255,0.07); padding:10px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+#header h1 { font-size:15px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; background:linear-gradient(135deg,#fff,#777); -webkit-background-clip:text; -webkit-text-fill-color:transparent; white-space:nowrap; }
+#stats { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.stat { text-align:center; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:5px 12px; min-width:60px; }
+.stat-val { font-size:17px; font-weight:700; color:#fff; line-height:1; }
+.stat-lbl { font-size:9px; color:#555; margin-top:2px; letter-spacing:.06em; text-transform:uppercase; }
+#timer-val { color:#e8c366; }
+#timer-val.urgent { color:#FF3B30; animation:pulse .5s infinite alternate; }
+@keyframes pulse { from{opacity:1} to{opacity:.4} }
+#region-badge { background:rgba(100,160,255,0.15); border:1px solid rgba(100,160,255,0.3); border-radius:6px; padding:4px 10px; font-size:11px; color:#64a0ff; letter-spacing:.04em; }
+
+#controls { display:flex; gap:8px; align-items:center; }
+#input-box { background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.15); border-radius:10px; padding:7px 13px; color:#fff; font-size:14px; font-family:inherit; width:190px; outline:none; transition:border .2s; }
+#input-box:focus { border-color:rgba(255,255,255,0.4); }
+#input-box.correct { border-color:#30d158; animation:flashG .4s; }
+#input-box.wrong   { border-color:#FF3B30; animation:flashR .2s; }
+@keyframes flashG { 0%,100%{background:rgba(255,255,255,.07)} 50%{background:rgba(48,209,88,.2)} }
+@keyframes flashR { 0%,100%{background:rgba(255,255,255,.07)} 50%{background:rgba(255,59,48,.2)} }
+
+.btn { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#fff; font-size:11px; font-family:inherit; font-weight:600; letter-spacing:.05em; padding:7px 13px; cursor:pointer; transition:background .15s; white-space:nowrap; }
+.btn:hover { background:rgba(255,255,255,0.14); }
+.btn.primary { background:rgba(48,209,88,0.2); border-color:rgba(48,209,88,0.4); color:#30d158; }
+.btn.primary:hover { background:rgba(48,209,88,0.3); }
+.btn.gold { background:rgba(232,195,102,0.15); border-color:rgba(232,195,102,0.35); color:#e8c366; }
+.btn.gold:hover { background:rgba(232,195,102,0.25); }
+
+#map-wrap { width:100%; max-width:1100px; padding:12px; flex:1; }
+#map-wrap svg { width:100%; display:block; }
+#progress-bar { height:3px; background:rgba(255,255,255,0.06); width:100%; }
+#progress-fill { height:100%; background:linear-gradient(90deg,#30d158,#e8c366); transition:width .3s; }
+
+/* ── OVERLAY BASE ── */
+.overlay { position:fixed; inset:0; background:rgba(10,10,15,.95); display:flex; align-items:center; justify-content:center; z-index:100; backdrop-filter:blur(10px); }
+.card { background:#13161c; border:1px solid rgba(255,255,255,0.1); border-radius:20px; padding:32px 40px; text-align:center; }
+.card h2 { font-size:20px; font-weight:700; margin-bottom:6px; background:linear-gradient(135deg,#fff,#888); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.card p { color:#555; font-size:12px; margin-bottom:20px; }
+
+/* ── SETUP ── */
+#setup-screen .card { min-width:420px; max-width:520px; }
+.section-title { font-size:10px; color:#555; letter-spacing:.08em; text-transform:uppercase; margin-bottom:10px; text-align:left; }
+
+/* Region grid */
+#region-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:20px; }
+.region-btn { background:rgba(255,255,255,0.04); border:1.5px solid rgba(255,255,255,0.09); border-radius:10px; padding:10px 8px; cursor:pointer; font-size:12px; font-family:inherit; color:#aaa; transition:all .15s; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.region-btn:hover { border-color:rgba(255,255,255,0.25); color:#fff; }
+.region-btn.selected { border-color:#64a0ff; color:#64a0ff; background:rgba(100,160,255,0.1); }
+.region-btn .r-emoji { font-size:18px; }
+.region-btn .r-count { font-size:9px; color:#555; }
+.region-btn.selected .r-count { color:#64a0ff99; }
+
+/* Time */
+.time-opts { display:flex; gap:8px; justify-content:center; margin-bottom:20px; flex-wrap:wrap; }
+.time-opt { background:rgba(255,255,255,0.05); border:1.5px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 14px; cursor:pointer; font-size:12px; font-family:inherit; color:#aaa; transition:all .15s; }
+.time-opt:hover { border-color:rgba(255,255,255,0.3); color:#fff; }
+.time-opt.selected { border-color:#e8c366; color:#e8c366; background:rgba(232,195,102,0.1); }
+.custom-row { display:flex; align-items:center; gap:10px; justify-content:center; margin-bottom:20px; }
+.custom-row input { background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.15); border-radius:8px; color:#fff; font-size:13px; font-family:inherit; padding:6px 10px; width:70px; text-align:center; outline:none; }
+.custom-row label { color:#555; font-size:12px; }
+
+/* Player name */
+#player-name-wrap { margin-bottom:20px; }
+#player-name { width:100%; background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.15); border-radius:10px; padding:9px 14px; color:#fff; font-size:14px; font-family:inherit; text-align:center; outline:none; transition:border .2s; }
+#player-name:focus { border-color:rgba(255,255,255,0.4); }
+
+/* ── END ── */
+#end-screen .card { min-width:400px; max-width:520px; }
+#score-big { font-size:52px; font-weight:800; color:#e8c366; line-height:1; margin:12px 0 4px; }
+#score-sub { color:#555; font-size:12px; margin-bottom:14px; }
+#found-list { display:flex; flex-wrap:wrap; gap:5px; margin:10px 0; max-height:100px; overflow-y:auto; justify-content:center; }
+.found-tag { background:rgba(48,209,88,0.1); border:1px solid rgba(48,209,88,0.25); border-radius:5px; padding:2px 8px; font-size:10px; color:#30d158; }
+#missed-wrap { text-align:left; max-height:120px; overflow-y:auto; margin:10px 0; }
+#missed-wrap h3 { font-size:10px; color:#555; letter-spacing:.07em; text-transform:uppercase; margin-bottom:8px; }
+.missed-item { font-size:11px; color:#666; padding:2px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.end-btns { display:flex; gap:8px; margin-top:16px; }
+.end-btns .btn { flex:1; }
+
+/* ── LEADERBOARD ── */
+#lb-screen .card { min-width:420px; max-width:520px; max-height:85vh; overflow-y:auto; }
+#lb-tabs { display:flex; gap:6px; margin-bottom:16px; justify-content:center; flex-wrap:wrap; }
+.lb-tab { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:7px; padding:5px 12px; cursor:pointer; font-size:11px; font-family:inherit; color:#666; transition:all .15s; }
+.lb-tab:hover { color:#aaa; }
+.lb-tab.active { border-color:#e8c366; color:#e8c366; background:rgba(232,195,102,0.1); }
+#lb-list { text-align:left; }
+.lb-row { display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid rgba(255,255,255,0.05); }
+.lb-rank { font-size:14px; font-weight:700; width:28px; text-align:center; }
+.lb-rank.r1 { color:#FFD700; }
+.lb-rank.r2 { color:#C0C0C0; }
+.lb-rank.r3 { color:#CD7F32; }
+.lb-name { flex:1; font-size:13px; color:#ddd; }
+.lb-region { font-size:10px; color:#555; }
+.lb-score { font-size:13px; font-weight:700; color:#e8c366; }
+.lb-pct { font-size:10px; color:#555; margin-left:4px; }
+.lb-time { font-size:10px; color:#555; }
+.lb-empty { color:#444; font-size:13px; text-align:center; padding:24px 0; }
+
+#tooltip { position:fixed; pointer-events:none; background:rgba(10,10,15,.92); border:1px solid rgba(255,255,255,.1); border-radius:7px; padding:4px 10px; font-size:11px; color:#ddd; z-index:50; white-space:nowrap; }
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- ── SETUP ── -->
+<div id="setup-screen" class="overlay">
+ <div class="card">
+  <h2>🌍 World Quiz</h2>
+  <p>Nomme un maximum de pays avant la fin du temps</p>
+
+  <div class="section-title">Ton nom</div>
+  <div id="player-name-wrap">
+   <input id="player-name" type="text" placeholder="Entre ton prénom…" maxlength="20" autocomplete="off"/>
+  </div>
+
+  <div class="section-title">Région</div>
+  <div id="region-grid"></div>
+
+  <div class="section-title">Durée</div>
+  <div class="time-opts">
+   <button class="time-opt" data-min="5">5 min</button>
+   <button class="time-opt selected" data-min="10">10 min</button>
+   <button class="time-opt" data-min="15">15 min</button>
+   <button class="time-opt" data-min="20">20 min</button>
+  </div>
+  <div class="custom-row">
+   <label>Personnaliser :</label>
+   <input id="custom-min" type="number" min="1" max="60" placeholder="min"/>
+  </div>
+  <div style="display:flex;gap:8px">
+   <button class="btn gold" style="flex:1;padding:10px" onclick="showLeaderboard()">🏆 Classement</button>
+   <button class="btn primary" style="flex:1.5;padding:10px;font-size:13px" onclick="startGame()">Démarrer →</button>
+  </div>
+ </div>
+</div>
+
+<!-- ── END ── -->
+<div id="end-screen" class="overlay hidden">
+ <div class="card">
+  <h2 id="end-title">⏱ Temps écoulé !</h2>
+  <div id="score-big"></div>
+  <div id="score-sub"></div>
+  <div id="found-list"></div>
+  <div id="missed-wrap"><h3>Pays non trouvés</h3></div>
+  <div class="end-btns">
+   <button class="btn gold" onclick="showLeaderboard()">🏆 Classement</button>
+   <button class="btn" onclick="showSetup()">⚙ Reconfigurer</button>
+   <button class="btn primary" onclick="restartSame()">↺ Rejouer</button>
+  </div>
+ </div>
+</div>
+
+<!-- ── LEADERBOARD ── -->
+<div id="lb-screen" class="overlay hidden">
+ <div class="card">
+  <h2>🏆 Classement</h2>
+  <p>Meilleurs scores par région</p>
+  <div id="lb-tabs"></div>
+  <div id="lb-list"></div>
+  <button class="btn" style="width:100%;margin-top:16px" onclick="hideLB()">← Retour</button>
+ </div>
+</div>
+
+<div id="tooltip" class="hidden"></div>
+
+<!-- ── HEADER ── -->
+<div id="header">
+ <h1>🌍 World Quiz</h1>
+ <div id="stats">
+  <div class="stat"><div class="stat-val" id="found-count">0</div><div class="stat-lbl">Trouvés</div></div>
+  <div class="stat"><div class="stat-val" id="total-count">—</div><div class="stat-lbl">Total</div></div>
+  <div class="stat"><div class="stat-val" id="timer-val">—</div><div class="stat-lbl">Temps</div></div>
+  <div id="region-badge">Monde</div>
+ </div>
+ <div id="controls">
+  <input type="text" id="input-box" placeholder="Nom d'un pays…" autocomplete="off" autocorrect="off" spellcheck="false"/>
+  <button class="btn gold" onclick="showLeaderboard()">🏆</button>
+  <button class="btn" onclick="giveUp()">⏹</button>
+ </div>
+</div>
+<div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+<div id="map-wrap"><svg id="world-svg" viewBox="0 0 1010 500" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════════════
+
+const REGIONS = {
+  world:   { label:"Monde entier", emoji:"🌍", color:"#e8c366" },
+  europe:  { label:"Europe",       emoji:"🇪🇺", color:"#64a0ff" },
+  asia:    { label:"Asie",         emoji:"🌏", color:"#ff9f40" },
+  africa:  { label:"Afrique",      emoji:"🌍", color:"#30d158" },
+  namerica:{ label:"Amér. Nord",   emoji:"🌎", color:"#ff6b6b" },
+  samerica:{ label:"Amér. Sud",    emoji:"🌎", color:"#ff8cc8" },
+  oceania: { label:"Océanie",      emoji:"🌊", color:"#5ac8fa" },
+};
+
+const COUNTRIES = [
+  // EUROPE
+  {id:"IS",r:"europe",names:["Islande","Iceland"],cx:430,cy:62,d:"M 422 58 L 432 55 L 440 58 L 437 65 L 428 67 Z"},
+  {id:"NO",r:"europe",names:["Norvège","Norvege","Norway"],cx:523,cy:88,d:"M 505 72 L 520 68 L 535 72 L 538 85 L 528 95 L 512 97 L 503 88 Z"},
+  {id:"SE",r:"europe",names:["Suède","Suede","Sweden"],cx:527,cy:96,d:"M 514 80 L 526 77 L 534 82 L 532 102 L 522 108 L 511 102 L 510 90 Z"},
+  {id:"FI",r:"europe",names:["Finlande","Finland"],cx:546,cy:84,d:"M 535 70 L 548 67 L 558 72 L 555 92 L 543 97 L 532 90 Z"},
+  {id:"DK",r:"europe",names:["Danemark","Denmark"],cx:514,cy:105,d:"M 509 101 L 516 99 L 519 103 L 516 109 L 509 109 Z"},
+  {id:"EE",r:"europe",names:["Estonie","Estonia"],cx:546,cy:100,d:"M 540 97 L 551 95 L 554 100 L 548 104 L 539 103 Z"},
+  {id:"LV",r:"europe",names:["Lettonie","Latvia"],cx:544,cy:106,d:"M 538 103 L 550 101 L 554 106 L 548 111 L 537 109 Z"},
+  {id:"LT",r:"europe",names:["Lituanie","Lithuania"],cx:541,cy:112,d:"M 535 109 L 547 107 L 551 112 L 543 117 L 534 115 Z"},
+  {id:"IE",r:"europe",names:["Irlande","Ireland"],cx:474,cy:110,d:"M 469 106 L 477 104 L 480 109 L 476 115 L 469 114 Z"},
+  {id:"GB",r:"europe",names:["Royaume-Uni","Royaume Uni","United Kingdom","UK","Grande-Bretagne"],cx:486,cy:108,d:"M 480 100 L 492 97 L 496 103 L 490 114 L 481 116 L 477 109 Z"},
+  {id:"NL",r:"europe",names:["Pays-Bas","Pays Bas","Netherlands","Hollande"],cx:502,cy:109,d:"M 498 106 L 506 104 L 508 109 L 503 113 L 497 112 Z"},
+  {id:"BE",r:"europe",names:["Belgique","Belgium"],cx:502,cy:113,d:"M 498 110 L 507 108 L 509 113 L 503 117 L 497 116 Z"},
+  {id:"LU",r:"europe",names:["Luxembourg"],cx:507,cy:115,d:"M 505 113 L 509 112 L 510 116 L 506 117 Z"},
+  {id:"FR",r:"europe",names:["France"],cx:498,cy:122,d:"M 487 112 L 500 109 L 510 113 L 511 126 L 501 133 L 488 130 L 483 120 Z"},
+  {id:"ES",r:"europe",names:["Espagne","Spain"],cx:486,cy:133,d:"M 469 124 L 488 120 L 502 124 L 500 138 L 483 143 L 466 137 Z"},
+  {id:"PT",r:"europe",names:["Portugal"],cx:470,cy:134,d:"M 465 124 L 472 122 L 474 130 L 470 140 L 463 138 Z"},
+  {id:"AD",r:"europe",names:["Andorre","Andorra"],cx:492,cy:128,d:"M 491 127 L 493 126 L 494 128 L 492 130 Z"},
+  {id:"DE",r:"europe",names:["Allemagne","Germany"],cx:511,cy:113,d:"M 505 105 L 519 102 L 524 108 L 520 120 L 508 123 L 501 116 Z"},
+  {id:"PL",r:"europe",names:["Pologne","Poland"],cx:525,cy:111,d:"M 518 104 L 533 101 L 539 107 L 534 119 L 521 121 L 515 114 Z"},
+  {id:"CZ",r:"europe",names:["République Tchèque","Republique Tcheque","Czech Republic","Tchéquie","Tcheque"],cx:519,cy:116,d:"M 513 113 L 524 111 L 527 116 L 520 120 L 512 118 Z"},
+  {id:"SK",r:"europe",names:["Slovaquie","Slovakia"],cx:528,cy:118,d:"M 522 116 L 534 114 L 537 119 L 529 122 L 521 121 Z"},
+  {id:"AT",r:"europe",names:["Autriche","Austria"],cx:518,cy:120,d:"M 511 117 L 524 115 L 527 120 L 519 124 L 510 122 Z"},
+  {id:"CH",r:"europe",names:["Suisse","Switzerland"],cx:507,cy:120,d:"M 502 117 L 512 116 L 513 121 L 506 124 L 500 121 Z"},
+  {id:"LI",r:"europe",names:["Liechtenstein"],cx:512,cy:120,d:"M 511 119 L 513 118 L 514 120 L 512 121 Z"},
+  {id:"HU",r:"europe",names:["Hongrie","Hungary"],cx:527,cy:122,d:"M 521 119 L 534 117 L 537 123 L 528 127 L 518 125 Z"},
+  {id:"SI",r:"europe",names:["Slovénie","Slovenie","Slovenia"],cx:516,cy:123,d:"M 512 121 L 520 120 L 521 124 L 515 126 L 510 124 Z"},
+  {id:"HR",r:"europe",names:["Croatie","Croatia"],cx:521,cy:127,d:"M 515 123 L 526 121 L 528 127 L 521 131 L 514 129 Z"},
+  {id:"IT",r:"europe",names:["Italie","Italy"],cx:515,cy:133,d:"M 506 123 L 518 120 L 522 127 L 519 140 L 511 147 L 504 140 L 502 130 Z"},
+  {id:"MC",r:"europe",names:["Monaco"],cx:505,cy:128,d:"M 504 127 L 506 127 L 506 129 L 504 129 Z"},
+  {id:"SM",r:"europe",names:["Saint-Marin","Saint Marin","San Marino"],cx:514,cy:129,d:"M 513 128 L 515 128 L 515 130 L 513 130 Z"},
+  {id:"VA",r:"europe",names:["Vatican"],cx:512,cy:133,d:"M 511 132 L 513 132 L 513 134 L 511 134 Z"},
+  {id:"BA",r:"europe",names:["Bosnie","Bosnie-Herzégovine","Bosnie Herzegovine","Bosnia"],cx:523,cy:128,d:"M 519 125 L 527 123 L 529 128 L 524 132 L 516 130 Z"},
+  {id:"RS",r:"europe",names:["Serbie","Serbia"],cx:527,cy:128,d:"M 522 124 L 532 122 L 535 129 L 527 133 L 519 130 Z"},
+  {id:"ME",r:"europe",names:["Monténégro","Montenegro"],cx:524,cy:131,d:"M 520 129 L 527 128 L 528 133 L 522 134 Z"},
+  {id:"AL",r:"europe",names:["Albanie","Albania"],cx:525,cy:135,d:"M 521 131 L 528 130 L 529 137 L 523 138 L 519 135 Z"},
+  {id:"MK",r:"europe",names:["Macédoine","Macedoine","North Macedonia","Macédoine du Nord"],cx:528,cy:133,d:"M 524 131 L 533 130 L 534 135 L 526 136 L 522 133 Z"},
+  {id:"XK",r:"europe",names:["Kosovo"],cx:527,cy:130,d:"M 524 129 L 530 128 L 531 132 L 525 133 Z"},
+  {id:"RO",r:"europe",names:["Roumanie","Romania"],cx:535,cy:122,d:"M 528 116 L 544 113 L 549 120 L 544 129 L 528 130 L 523 122 Z"},
+  {id:"BG",r:"europe",names:["Bulgarie","Bulgaria"],cx:535,cy:129,d:"M 527 125 L 543 122 L 546 130 L 535 134 L 525 131 Z"},
+  {id:"GR",r:"europe",names:["Grèce","Grece","Greece"],cx:531,cy:138,d:"M 524 132 L 537 129 L 540 137 L 533 144 L 523 141 Z"},
+  {id:"CY",r:"europe",names:["Chypre","Cyprus"],cx:549,cy:141,d:"M 545 139 L 553 138 L 554 142 L 547 143 Z"},
+  {id:"MT",r:"europe",names:["Malte","Malta"],cx:513,cy:145,d:"M 511 144 L 515 143 L 515 146 L 511 146 Z"},
+  {id:"BY",r:"europe",names:["Biélorussie","Bielorussie","Belarus"],cx:541,cy:109,d:"M 533 104 L 548 101 L 553 107 L 547 115 L 532 116 Z"},
+  {id:"UA",r:"europe",names:["Ukraine"],cx:546,cy:117,d:"M 535 109 L 557 106 L 563 114 L 555 125 L 534 124 L 528 117 Z"},
+  {id:"MD",r:"europe",names:["Moldavie","Moldova"],cx:547,cy:122,d:"M 543 119 L 551 117 L 552 124 L 544 126 Z"},
+
+  // ASIA
+  {id:"RU",r:"asia",names:["Russie","Russia"],cx:670,cy:82,d:"M 555 65 L 710 60 L 800 65 L 810 80 L 790 95 L 730 100 L 650 98 L 570 96 L 550 85 Z"},
+  {id:"KZ",r:"asia",names:["Kazakhstan"],cx:635,cy:115,d:"M 575 105 L 630 100 L 665 108 L 663 128 L 630 135 L 575 128 Z"},
+  {id:"UZ",r:"asia",names:["Ouzbékistan","Ouzbekistan","Uzbekistan"],cx:631,cy:130,d:"M 618 125 L 643 122 L 648 131 L 635 138 L 617 135 Z"},
+  {id:"TM",r:"asia",names:["Turkménistan","Turkmenistan"],cx:619,cy:135,d:"M 605 128 L 633 125 L 635 138 L 617 144 L 602 138 Z"},
+  {id:"TJ",r:"asia",names:["Tadjikistan","Tajikistan"],cx:642,cy:132,d:"M 637 128 L 650 126 L 653 134 L 643 138 L 635 135 Z"},
+  {id:"KG",r:"asia",names:["Kirghizistan","Kirghizstan","Kyrgyzstan"],cx:647,cy:125,d:"M 640 122 L 657 120 L 659 127 L 647 130 L 638 127 Z"},
+  {id:"GE",r:"asia",names:["Géorgie","Georgie","Georgia"],cx:568,cy:127,d:"M 561 124 L 576 121 L 578 127 L 566 131 L 559 128 Z"},
+  {id:"AM",r:"asia",names:["Arménie","Armenie","Armenia"],cx:570,cy:131,d:"M 564 128 L 576 126 L 577 133 L 568 135 L 562 132 Z"},
+  {id:"AZ",r:"asia",names:["Azerbaïdjan","Azerbaidjan","Azerbaijan"],cx:575,cy:130,d:"M 569 126 L 582 124 L 584 133 L 573 136 L 566 132 Z"},
+  {id:"TR",r:"asia",names:["Turquie","Turkey"],cx:554,cy:133,d:"M 540 127 L 572 124 L 578 131 L 572 140 L 541 141 L 534 134 Z"},
+  {id:"SY",r:"asia",names:["Syrie","Syria"],cx:565,cy:139,d:"M 557 134 L 573 131 L 576 140 L 562 145 L 553 141 Z"},
+  {id:"LB",r:"asia",names:["Liban","Lebanon"],cx:559,cy:140,d:"M 556 138 L 562 137 L 562 143 L 556 143 Z"},
+  {id:"IL",r:"asia",names:["Israël","Israel"],cx:558,cy:144,d:"M 554 140 L 561 139 L 561 148 L 555 149 Z"},
+  {id:"JO",r:"asia",names:["Jordanie","Jordan"],cx:563,cy:146,d:"M 558 141 L 569 139 L 570 149 L 560 152 L 555 147 Z"},
+  {id:"IQ",r:"asia",names:["Irak","Iraq"],cx:573,cy:142,d:"M 564 134 L 582 130 L 586 142 L 576 151 L 561 147 L 560 140 Z"},
+  {id:"IR",r:"asia",names:["Iran"],cx:590,cy:140,d:"M 578 129 L 610 126 L 618 138 L 608 154 L 583 157 L 571 147 L 572 137 Z"},
+  {id:"KW",r:"asia",names:["Koweït","Koweit","Kuwait"],cx:578,cy:150,d:"M 575 148 L 581 147 L 581 153 L 574 153 Z"},
+  {id:"SA",r:"asia",names:["Arabie Saoudite","Saudi Arabia"],cx:577,cy:158,d:"M 557 148 L 590 144 L 600 155 L 592 172 L 564 174 L 549 162 Z"},
+  {id:"AE",r:"asia",names:["Émirats Arabes Unis","Emirats Arabes Unis","UAE","Emirats"],cx:598,cy:159,d:"M 593 154 L 605 152 L 607 161 L 595 163 Z"},
+  {id:"QA",r:"asia",names:["Qatar"],cx:593,cy:158,d:"M 590 155 L 595 154 L 595 161 L 589 161 Z"},
+  {id:"BH",r:"asia",names:["Bahreïn","Bahrein","Bahrain"],cx:590,cy:157,d:"M 588 155 L 591 155 L 591 159 L 588 159 Z"},
+  {id:"OM",r:"asia",names:["Oman"],cx:603,cy:163,d:"M 598 154 L 612 154 L 614 167 L 600 172 L 594 163 Z"},
+  {id:"YE",r:"asia",names:["Yémen","Yemen"],cx:584,cy:170,d:"M 563 163 L 596 160 L 600 170 L 575 178 L 556 171 Z"},
+  {id:"AF",r:"asia",names:["Afghanistan"],cx:618,cy:138,d:"M 608 128 L 632 124 L 640 133 L 632 147 L 610 150 L 601 140 Z"},
+  {id:"PK",r:"asia",names:["Pakistan"],cx:628,cy:148,d:"M 617 136 L 645 132 L 651 145 L 638 160 L 615 157 L 610 145 Z"},
+  {id:"IN",r:"asia",names:["Inde","India"],cx:651,cy:160,d:"M 635 143 L 665 139 L 672 153 L 665 177 L 645 185 L 628 175 L 625 158 Z"},
+  {id:"NP",r:"asia",names:["Népal","Nepal"],cx:658,cy:148,d:"M 648 145 L 667 143 L 668 150 L 648 151 Z"},
+  {id:"BT",r:"asia",names:["Bhoutan","Bhutan"],cx:670,cy:149,d:"M 666 147 L 674 146 L 674 151 L 665 151 Z"},
+  {id:"BD",r:"asia",names:["Bangladesh"],cx:670,cy:157,d:"M 664 153 L 675 151 L 676 160 L 664 161 Z"},
+  {id:"LK",r:"asia",names:["Sri Lanka"],cx:655,cy:183,d:"M 651 180 L 658 179 L 659 186 L 652 187 Z"},
+  {id:"MV",r:"asia",names:["Maldives"],cx:646,cy:190,d:"M 644 188 L 648 188 L 648 193 L 644 193 Z"},
+  {id:"MM",r:"asia",names:["Myanmar","Birmanie"],cx:691,cy:157,d:"M 680 148 L 698 145 L 702 158 L 693 169 L 679 163 Z"},
+  {id:"TH",r:"asia",names:["Thaïlande","Thailande","Thailand"],cx:700,cy:165,d:"M 694 156 L 708 153 L 712 165 L 703 176 L 691 170 Z"},
+  {id:"LA",r:"asia",names:["Laos"],cx:704,cy:160,d:"M 699 153 L 712 150 L 714 162 L 703 167 L 697 160 Z"},
+  {id:"VN",r:"asia",names:["Viêt Nam","Vietnam","Viet Nam"],cx:712,cy:165,d:"M 706 153 L 718 151 L 718 170 L 708 174 L 703 164 Z"},
+  {id:"KH",r:"asia",names:["Cambodge","Cambodia"],cx:707,cy:170,d:"M 701 165 L 714 163 L 714 173 L 700 174 Z"},
+  {id:"MY",r:"asia",names:["Malaisie","Malaysia"],cx:710,cy:178,d:"M 700 173 L 720 170 L 722 180 L 700 182 Z"},
+  {id:"SG",r:"asia",names:["Singapour","Singapore"],cx:712,cy:183,d:"M 709 181 L 715 181 L 715 185 L 709 185 Z"},
+  {id:"BN",r:"asia",names:["Brunei","Brunéi"],cx:725,cy:178,d:"M 722 176 L 728 176 L 728 181 L 721 181 Z"},
+  {id:"ID",r:"asia",names:["Indonésie","Indonesie","Indonesia"],cx:735,cy:188,d:"M 710 182 L 770 180 L 775 192 L 745 198 L 705 194 Z"},
+  {id:"TL",r:"asia",names:["Timor-Leste","Timor oriental","East Timor"],cx:760,cy:196,d:"M 756 193 L 764 193 L 764 198 L 755 198 Z"},
+  {id:"PH",r:"asia",names:["Philippines"],cx:737,cy:167,d:"M 728 158 L 744 155 L 748 168 L 736 175 L 726 168 Z"},
+  {id:"CN",r:"asia",names:["Chine","China"],cx:718,cy:140,d:"M 665 115 L 745 110 L 760 125 L 750 150 L 720 158 L 685 155 L 668 140 Z"},
+  {id:"MN",r:"asia",names:["Mongolie","Mongolia"],cx:710,cy:112,d:"M 668 103 L 745 100 L 752 112 L 738 122 L 673 122 Z"},
+  {id:"KP",r:"asia",names:["Corée du Nord","Coree du Nord","North Korea"],cx:748,cy:130,d:"M 742 124 L 757 122 L 759 131 L 748 135 L 740 131 Z"},
+  {id:"KR",r:"asia",names:["Corée du Sud","Coree du Sud","South Korea"],cx:751,cy:136,d:"M 745 132 L 759 130 L 760 138 L 747 140 Z"},
+  {id:"JP",r:"asia",names:["Japon","Japan"],cx:762,cy:128,d:"M 758 120 L 770 118 L 772 130 L 762 136 L 755 128 Z"},
+  {id:"TW",r:"asia",names:["Taïwan","Taiwan"],cx:752,cy:148,d:"M 748 145 L 755 144 L 756 151 L 748 152 Z"},
+
+  // AFRICA
+  {id:"MA",r:"africa",names:["Maroc","Morocco"],cx:480,cy:143,d:"M 465 136 L 490 133 L 493 144 L 480 152 L 462 148 Z"},
+  {id:"EH",r:"africa",names:["Sahara occidental","Western Sahara"],cx:471,cy:153,d:"M 462 148 L 481 145 L 482 158 L 465 161 Z"},
+  {id:"DZ",r:"africa",names:["Algérie","Algerie","Algeria"],cx:497,cy:147,d:"M 481 135 L 512 132 L 516 152 L 502 165 L 475 162 L 474 148 Z"},
+  {id:"TN",r:"africa",names:["Tunisie","Tunisia"],cx:513,cy:138,d:"M 509 132 L 518 131 L 520 142 L 512 146 L 507 140 Z"},
+  {id:"LY",r:"africa",names:["Libye","Libya"],cx:518,cy:150,d:"M 510 140 L 538 137 L 541 157 L 522 167 L 500 163 L 500 148 Z"},
+  {id:"EG",r:"africa",names:["Égypte","Egypte","Egypt"],cx:545,cy:150,d:"M 537 140 L 558 138 L 561 155 L 540 162 L 532 152 Z"},
+  {id:"MR",r:"africa",names:["Mauritanie","Mauritania"],cx:471,cy:168,d:"M 455 156 L 484 153 L 488 172 L 462 178 L 450 170 Z"},
+  {id:"ML",r:"africa",names:["Mali"],cx:487,cy:168,d:"M 475 153 L 508 150 L 512 172 L 488 178 L 470 173 Z"},
+  {id:"SN",r:"africa",names:["Sénégal","Senegal"],cx:457,cy:177,d:"M 449 172 L 466 169 L 467 179 L 450 182 Z"},
+  {id:"GM",r:"africa",names:["Gambie","Gambia"],cx:456,cy:179,d:"M 452 177 L 463 177 L 463 181 L 451 181 Z"},
+  {id:"GW",r:"africa",names:["Guinée-Bissau","Guinee-Bissau","Guinea-Bissau"],cx:456,cy:183,d:"M 451 181 L 462 180 L 462 186 L 450 186 Z"},
+  {id:"GN",r:"africa",names:["Guinée","Guinee","Guinea"],cx:463,cy:185,d:"M 455 181 L 472 179 L 474 189 L 456 193 Z"},
+  {id:"SL",r:"africa",names:["Sierra Leone"],cx:460,cy:192,d:"M 454 188 L 467 186 L 467 196 L 453 196 Z"},
+  {id:"LR",r:"africa",names:["Libéria","Liberia"],cx:465,cy:196,d:"M 458 192 L 473 190 L 474 200 L 458 201 Z"},
+  {id:"CI",r:"africa",names:["Côte d'Ivoire","Cote d'Ivoire","Ivory Coast","Cote Ivoire"],cx:474,cy:195,d:"M 466 189 L 484 187 L 487 200 L 465 202 Z"},
+  {id:"BF",r:"africa",names:["Burkina Faso","Burkina"],cx:485,cy:181,d:"M 476 175 L 497 172 L 500 183 L 476 186 Z"},
+  {id:"GH",r:"africa",names:["Ghana"],cx:485,cy:193,d:"M 480 183 L 492 181 L 494 197 L 478 199 Z"},
+  {id:"TG",r:"africa",names:["Togo"],cx:490,cy:193,d:"M 488 183 L 494 182 L 495 200 L 487 200 Z"},
+  {id:"BJ",r:"africa",names:["Bénin","Benin"],cx:494,cy:191,d:"M 491 181 L 499 180 L 500 198 L 489 199 Z"},
+  {id:"NG",r:"africa",names:["Nigéria","Nigeria"],cx:502,cy:189,d:"M 493 177 L 516 174 L 519 195 L 494 200 Z"},
+  {id:"NE",r:"africa",names:["Niger"],cx:500,cy:171,d:"M 483 157 L 520 154 L 524 172 L 494 178 L 476 175 Z"},
+  {id:"CV",r:"africa",names:["Cap-Vert","Cap Vert","Cape Verde"],cx:444,cy:180,d:"M 440 178 L 447 178 L 447 183 L 440 183 Z"},
+  {id:"CM",r:"africa",names:["Cameroun","Cameroon"],cx:510,cy:197,d:"M 499 187 L 518 184 L 521 200 L 502 208 Z"},
+  {id:"TD",r:"africa",names:["Tchad","Chad"],cx:514,cy:181,d:"M 503 165 L 528 162 L 532 182 L 508 190 Z"},
+  {id:"CF",r:"africa",names:["République Centrafricaine","RCA","Central African Republic"],cx:524,cy:197,d:"M 510 189 L 538 185 L 541 203 L 510 208 Z"},
+  {id:"GQ",r:"africa",names:["Guinée équatoriale","Guinee equatoriale","Equatorial Guinea"],cx:508,cy:209,d:"M 504 207 L 513 207 L 513 213 L 503 213 Z"},
+  {id:"GA",r:"africa",names:["Gabon"],cx:512,cy:213,d:"M 505 206 L 520 204 L 522 218 L 506 220 Z"},
+  {id:"CG",r:"africa",names:["Congo","République du Congo","Republique du Congo"],cx:519,cy:213,d:"M 512 205 L 528 202 L 530 220 L 512 222 Z"},
+  {id:"ST",r:"africa",names:["São Tomé-et-Príncipe","Sao Tome"],cx:506,cy:216,d:"M 503 214 L 508 214 L 508 219 L 503 219 Z"},
+  {id:"CD",r:"africa",names:["Congo (RDC)","RDC","République Démocratique du Congo","DR Congo"],cx:530,cy:215,d:"M 518 198 L 548 194 L 558 210 L 546 230 L 518 228 Z"},
+  {id:"AO",r:"africa",names:["Angola"],cx:521,cy:228,d:"M 508 218 L 536 214 L 540 235 L 512 240 Z"},
+  {id:"BI",r:"africa",names:["Burundi"],cx:542,cy:218,d:"M 537 215 L 546 214 L 547 222 L 537 222 Z"},
+  {id:"RW",r:"africa",names:["Rwanda"],cx:540,cy:212,d:"M 535 210 L 544 209 L 545 215 L 534 216 Z"},
+  {id:"SD",r:"africa",names:["Soudan","Sudan"],cx:543,cy:168,d:"M 530 150 L 558 148 L 562 170 L 540 178 L 523 173 Z"},
+  {id:"SS",r:"africa",names:["Soudan du Sud","South Sudan"],cx:543,cy:183,d:"M 525 174 L 558 171 L 560 190 L 524 194 Z"},
+  {id:"ER",r:"africa",names:["Érythrée","Erythree","Eritrea"],cx:563,cy:168,d:"M 557 162 L 573 160 L 574 172 L 558 175 Z"},
+  {id:"ET",r:"africa",names:["Éthiopie","Ethiopie","Ethiopia"],cx:563,cy:180,d:"M 550 170 L 578 166 L 584 183 L 558 196 L 541 188 Z"},
+  {id:"DJ",r:"africa",names:["Djibouti"],cx:577,cy:175,d:"M 573 172 L 581 172 L 581 179 L 572 179 Z"},
+  {id:"SO",r:"africa",names:["Somalie","Somalia"],cx:576,cy:188,d:"M 569 172 L 585 170 L 590 195 L 565 202 L 556 188 Z"},
+  {id:"UG",r:"africa",names:["Ouganda","Uganda"],cx:543,cy:196,d:"M 536 189 L 553 186 L 555 200 L 535 203 Z"},
+  {id:"KE",r:"africa",names:["Kenya"],cx:555,cy:202,d:"M 545 191 L 568 188 L 571 208 L 546 213 Z"},
+  {id:"TZ",r:"africa",names:["Tanzanie","Tanzania"],cx:549,cy:216,d:"M 535 204 L 564 201 L 565 225 L 532 228 Z"},
+  {id:"MZ",r:"africa",names:["Mozambique"],cx:549,cy:235,d:"M 540 222 L 560 219 L 564 250 L 540 252 Z"},
+  {id:"ZM",r:"africa",names:["Zambie","Zambia"],cx:539,cy:228,d:"M 521 217 L 550 214 L 553 233 L 520 236 Z"},
+  {id:"MW",r:"africa",names:["Malawi"],cx:553,cy:231,d:"M 549 222 L 558 221 L 560 240 L 550 241 Z"},
+  {id:"MG",r:"africa",names:["Madagascar"],cx:573,cy:235,d:"M 567 218 L 578 215 L 582 245 L 569 250 Z"},
+  {id:"ZW",r:"africa",names:["Zimbabwe"],cx:541,cy:237,d:"M 528 230 L 553 228 L 554 245 L 526 246 Z"},
+  {id:"BW",r:"africa",names:["Botswana"],cx:535,cy:244,d:"M 520 237 L 549 235 L 550 254 L 518 255 Z"},
+  {id:"NA",r:"africa",names:["Namibie","Namibia"],cx:521,cy:244,d:"M 507 230 L 530 228 L 532 255 L 504 257 Z"},
+  {id:"ZA",r:"africa",names:["Afrique du Sud","South Africa"],cx:535,cy:258,d:"M 509 249 L 558 246 L 560 265 L 530 272 L 503 264 Z"},
+  {id:"SZ",r:"africa",names:["Eswatini","Swaziland"],cx:550,cy:252,d:"M 546 249 L 554 249 L 555 256 L 545 256 Z"},
+  {id:"LS",r:"africa",names:["Lesotho"],cx:538,cy:259,d:"M 534 257 L 542 256 L 543 262 L 534 263 Z"},
+  {id:"KM",r:"africa",names:["Comores","Comoros"],cx:567,cy:224,d:"M 563 222 L 571 221 L 571 227 L 562 227 Z"},
+  {id:"SC",r:"africa",names:["Seychelles"],cx:582,cy:208,d:"M 578 206 L 586 206 L 586 211 L 577 211 Z"},
+  {id:"MU",r:"africa",names:["Maurice","Mauritius"],cx:583,cy:237,d:"M 579 235 L 587 234 L 587 240 L 579 240 Z"},
+
+  // NORTH AMERICA
+  {id:"CA",r:"namerica",names:["Canada"],cx:220,cy:78,d:"M 135 60 L 310 55 L 325 70 L 295 90 L 200 95 L 130 85 Z"},
+  {id:"US",r:"namerica",names:["États-Unis","Etats-Unis","USA","United States"],cx:200,cy:120,d:"M 140 100 L 295 96 L 300 130 L 225 145 L 140 140 Z"},
+  {id:"MX",r:"namerica",names:["Mexique","Mexico"],cx:188,cy:147,d:"M 140 135 L 210 131 L 218 150 L 195 163 L 152 158 Z"},
+  {id:"GT",r:"namerica",names:["Guatemala"],cx:185,cy:165,d:"M 179 161 L 191 160 L 192 169 L 178 169 Z"},
+  {id:"BZ",r:"namerica",names:["Belize"],cx:192,cy:162,d:"M 189 158 L 196 158 L 196 166 L 188 166 Z"},
+  {id:"HN",r:"namerica",names:["Honduras"],cx:194,cy:167,d:"M 188 163 L 202 162 L 203 170 L 186 171 Z"},
+  {id:"SV",r:"namerica",names:["Salvador","El Salvador"],cx:188,cy:169,d:"M 184 167 L 194 166 L 194 172 L 183 172 Z"},
+  {id:"NI",r:"namerica",names:["Nicaragua"],cx:196,cy:172,d:"M 188 168 L 204 167 L 205 177 L 186 178 Z"},
+  {id:"CR",r:"namerica",names:["Costa Rica"],cx:197,cy:178,d:"M 190 175 L 203 174 L 204 181 L 189 181 Z"},
+  {id:"PA",r:"namerica",names:["Panama"],cx:203,cy:181,d:"M 198 178 L 212 177 L 212 184 L 196 184 Z"},
+  {id:"CU",r:"namerica",names:["Cuba"],cx:218,cy:157,d:"M 208 154 L 232 152 L 233 160 L 208 162 Z"},
+  {id:"JM",r:"namerica",names:["Jamaïque","Jamaique","Jamaica"],cx:220,cy:162,d:"M 216 160 L 225 160 L 225 165 L 215 165 Z"},
+  {id:"HT",r:"namerica",names:["Haïti","Haiti"],cx:232,cy:160,d:"M 228 158 L 237 157 L 237 164 L 227 164 Z"},
+  {id:"DO",r:"namerica",names:["République Dominicaine","Republique Dominicaine","Dominican Republic"],cx:238,cy:160,d:"M 234 157 L 244 156 L 244 163 L 233 163 Z"},
+  {id:"PR",r:"namerica",names:["Porto Rico","Puerto Rico"],cx:247,cy:161,d:"M 244 159 L 251 159 L 251 164 L 243 164 Z"},
+  {id:"TT",r:"namerica",names:["Trinité-et-Tobago","Trinidad","Trinidad and Tobago"],cx:249,cy:178,d:"M 245 176 L 253 176 L 253 181 L 244 181 Z"},
+  {id:"BB",r:"namerica",names:["Barbade","Barbados"],cx:254,cy:174,d:"M 251 172 L 257 172 L 257 177 L 250 177 Z"},
+
+  // SOUTH AMERICA
+  {id:"CO",r:"samerica",names:["Colombie","Colombia"],cx:225,cy:192,d:"M 205 181 L 245 178 L 248 198 L 220 207 L 200 198 Z"},
+  {id:"VE",r:"samerica",names:["Venezuela"],cx:240,cy:185,d:"M 222 177 L 258 173 L 260 190 L 232 196 Z"},
+  {id:"GY",r:"samerica",names:["Guyana"],cx:260,cy:190,d:"M 255 183 L 269 181 L 270 196 L 253 198 Z"},
+  {id:"SR",r:"samerica",names:["Suriname"],cx:268,cy:190,d:"M 265 183 L 277 181 L 277 196 L 263 197 Z"},
+  {id:"GF",r:"samerica",names:["Guyane française","Guyane francaise","French Guiana"],cx:275,cy:192,d:"M 273 183 L 284 182 L 284 198 L 270 198 Z"},
+  {id:"EC",r:"samerica",names:["Équateur","Equateur","Ecuador"],cx:211,cy:207,d:"M 202 199 L 221 197 L 222 212 L 200 214 Z"},
+  {id:"PE",r:"samerica",names:["Pérou","Perou","Peru"],cx:219,cy:220,d:"M 200 206 L 234 202 L 237 232 L 205 238 Z"},
+  {id:"BR",r:"samerica",names:["Brésil","Bresil","Brazil"],cx:265,cy:215,d:"M 238 188 L 298 183 L 305 230 L 265 252 L 225 245 L 220 220 Z"},
+  {id:"BO",r:"samerica",names:["Bolivie","Bolivia"],cx:238,cy:232,d:"M 220 218 L 253 214 L 256 242 L 220 246 Z"},
+  {id:"PY",r:"samerica",names:["Paraguay"],cx:253,cy:244,d:"M 236 234 L 266 231 L 266 254 L 233 256 Z"},
+  {id:"UY",r:"samerica",names:["Uruguay"],cx:260,cy:260,d:"M 248 252 L 270 249 L 270 266 L 245 267 Z"},
+  {id:"AR",r:"samerica",names:["Argentine","Argentina"],cx:245,cy:267,d:"M 220 245 L 265 241 L 265 295 L 235 305 L 212 282 Z"},
+  {id:"CL",r:"samerica",names:["Chili","Chile"],cx:225,cy:275,d:"M 207 234 L 222 232 L 225 295 L 208 305 Z"},
+
+  // OCEANIA
+  {id:"AU",r:"oceania",names:["Australie","Australia"],cx:770,cy:240,d:"M 718 210 L 810 205 L 820 235 L 800 265 L 740 268 L 710 248 Z"},
+  {id:"PG",r:"oceania",names:["Papouasie-Nouvelle-Guinée","Papua New Guinea","Papouasie"],cx:784,cy:200,d:"M 770 193 L 800 189 L 803 205 L 775 210 Z"},
+  {id:"NZ",r:"oceania",names:["Nouvelle-Zélande","Nouvelle Zelande","New Zealand"],cx:830,cy:265,d:"M 823 258 L 836 255 L 838 268 L 824 272 Z"},
+  {id:"FJ",r:"oceania",names:["Fidji","Fiji"],cx:860,cy:232,d:"M 855 229 L 865 228 L 866 235 L 854 236 Z"},
+  {id:"SB",r:"oceania",names:["Îles Salomon","Solomon Islands","Salomon"],cx:820,cy:218,d:"M 815 215 L 826 214 L 826 222 L 814 222 Z"},
+  {id:"VU",r:"oceania",names:["Vanuatu"],cx:833,cy:228,d:"M 829 225 L 837 224 L 837 232 L 828 232 Z"},
+  {id:"WS",r:"oceania",names:["Samoa"],cx:882,cy:232,d:"M 877 230 L 886 229 L 887 234 L 876 235 Z"},
+  {id:"TO",r:"oceania",names:["Tonga"],cx:874,cy:244,d:"M 870 241 L 878 240 L 878 247 L 869 247 Z"},
+  {id:"KI",r:"oceania",names:["Kiribati"],cx:880,cy:200,d:"M 875 197 L 886 197 L 886 204 L 874 204 Z"},
+  {id:"FM",r:"oceania",names:["Micronésie","Micronesie","Micronesia"],cx:812,cy:180,d:"M 806 177 L 818 177 L 818 183 L 805 183 Z"},
+  {id:"MH",r:"oceania",names:["Marshall","Îles Marshall","Marshall Islands"],cx:845,cy:178,d:"M 840 175 L 850 175 L 850 181 L 839 181 Z"},
+  {id:"PW",r:"oceania",names:["Palaos","Palau"],cx:785,cy:181,d:"M 781 178 L 789 178 L 789 184 L 780 184 Z"},
+  {id:"NR",r:"oceania",names:["Nauru"],cx:840,cy:200,d:"M 837 198 L 843 197 L 843 202 L 836 202 Z"},
+  {id:"TV",r:"oceania",names:["Tuvalu"],cx:862,cy:212,d:"M 858 210 L 866 209 L 866 215 L 857 215 Z"},
+];
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let found = new Set();
+let timerInterval = null;
+let timeLeft = 600, totalTime = 600;
+let gameActive = false;
+let selectedMinutes = 10;
+let selectedRegion = "world";
+let currentPlayer = "";
+let activeCountries = [];
+let lbRegionFilter = "world";
+
+// ══════════════════════════════════════════════════════════
+// LEADERBOARD (localStorage)
+// ══════════════════════════════════════════════════════════
+function lbKey() { return "wq_lb"; }
+function loadLB() {
+  try { return JSON.parse(localStorage.getItem(lbKey()) || "[]"); }
+  catch(e) { return []; }
+}
+function saveLB(data) {
+  localStorage.setItem(lbKey(), JSON.stringify(data));
+}
+function addScore(player, region, score, total, minutes) {
+  const lb = loadLB();
+  lb.push({ player, region, score, total, pct: Math.round(score/total*100), minutes, date: new Date().toLocaleDateString("fr-FR") });
+  lb.sort((a,b) => b.pct - a.pct || b.score - a.score);
+  saveLB(lb);
+}
+
+// ══════════════════════════════════════════════════════════
+// SETUP UI
+// ══════════════════════════════════════════════════════════
+function buildRegionGrid() {
+  const grid = document.getElementById("region-grid");
+  grid.innerHTML = "";
+  const counts = {};
+  COUNTRIES.forEach(c => { counts[c.r] = (counts[c.r]||0)+1; });
+  const total = COUNTRIES.length;
+
+  Object.entries(REGIONS).forEach(([key, r]) => {
+    const cnt = key === "world" ? total : (counts[key]||0);
+    const btn = document.createElement("button");
+    btn.className = "region-btn" + (key === selectedRegion ? " selected" : "");
+    btn.innerHTML = `<span class="r-emoji">${r.emoji}</span>${r.label}<span class="r-count">${cnt} pays</span>`;
+    btn.onclick = () => {
+      document.querySelectorAll(".region-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedRegion = key;
+    };
+    grid.appendChild(btn);
+  });
+}
+
+document.querySelectorAll(".time-opt").forEach(b => {
+  b.addEventListener("click", function() {
+    document.querySelectorAll(".time-opt").forEach(x => x.classList.remove("selected"));
+    this.classList.add("selected");
+    selectedMinutes = parseInt(this.dataset.min);
+    document.getElementById("custom-min").value = "";
+  });
+});
+document.getElementById("custom-min").addEventListener("input", function() {
+  if (this.value) {
+    document.querySelectorAll(".time-opt").forEach(x => x.classList.remove("selected"));
+    selectedMinutes = parseInt(this.value) || 10;
+  }
+});
+
+buildRegionGrid();
+
+// ══════════════════════════════════════════════════════════
+// MAP
+// ══════════════════════════════════════════════════════════
+function buildMap() {
+  const svg = document.getElementById("world-svg");
+  svg.innerHTML = "";
+  const defs = document.createElementNS("http://www.w3.org/2000/svg","defs");
+  defs.innerHTML = `<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.02)" stroke-width="0.5"/></pattern>`;
+  svg.appendChild(defs);
+  const bg = document.createElementNS("http://www.w3.org/2000/svg","rect");
+  bg.setAttribute("width","1010"); bg.setAttribute("height","500"); bg.setAttribute("fill","#0d1822");
+  svg.appendChild(bg);
+  const gridR = document.createElementNS("http://www.w3.org/2000/svg","rect");
+  gridR.setAttribute("width","1010"); gridR.setAttribute("height","500"); gridR.setAttribute("fill","url(#grid)");
+  svg.appendChild(gridR);
+
+  COUNTRIES.forEach(c => {
+    const inScope = activeCountries.includes(c);
+    const g = document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.id = "g-" + c.id;
+    const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d", c.d);
+    path.setAttribute("fill", inScope ? "rgba(200,215,230,0.2)" : "rgba(255,255,255,0.04)");
+    path.setAttribute("stroke", inScope ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.08)");
+    path.setAttribute("stroke-width","0.6");
+    path.id = "path-" + c.id;
+    path.addEventListener("mouseenter", (e) => {
+      if (found.has(c.id)) {
+        const tt = document.getElementById("tooltip");
+        tt.textContent = c.names[0];
+        tt.classList.remove("hidden");
+      }
+    });
+    path.addEventListener("mousemove", (e) => {
+      if (found.has(c.id)) {
+        const tt = document.getElementById("tooltip");
+        tt.style.left = (e.clientX+14)+"px";
+        tt.style.top = (e.clientY-10)+"px";
+      }
+    });
+    path.addEventListener("mouseleave", () => document.getElementById("tooltip").classList.add("hidden"));
+    g.appendChild(path);
+    svg.appendChild(g);
+  });
+}
+
+function markFound(id) {
+  const c = COUNTRIES.find(x => x.id === id);
+  const col = REGIONS[c.r]?.color || "#30d158";
+  const path = document.getElementById("path-"+id);
+  if (!path) return;
+  path.setAttribute("fill", hexToRgba(col, 0.72));
+  path.setAttribute("stroke", col);
+  path.setAttribute("stroke-width","1");
+  const svg = document.getElementById("world-svg");
+  const pin = document.createElementNS("http://www.w3.org/2000/svg","g");
+  pin.style.pointerEvents = "none";
+  pin.innerHTML = `<path d="M${c.cx} ${c.cy-7}C${c.cx-4} ${c.cy-7} ${c.cx-7} ${c.cy-4} ${c.cx-7} ${c.cy}C${c.cx-7} ${c.cy+5} ${c.cx} ${c.cy+10} ${c.cx} ${c.cy+10}C${c.cx} ${c.cy+10} ${c.cx+7} ${c.cy+5} ${c.cx+7} ${c.cy}C${c.cx+7} ${c.cy-4} ${c.cx+4} ${c.cy-7} ${c.cx} ${c.cy-7}Z" fill="#FF3B30" stroke="white" stroke-width="0.8"/><circle cx="${c.cx}" cy="${c.cy}" r="2.2" fill="white" opacity=".85"/>`;
+  svg.appendChild(pin);
+}
+
+function hexToRgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ══════════════════════════════════════════════════════════
+// GAME
+// ══════════════════════════════════════════════════════════
+function normalize(s) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[-']/g," ").trim();
+}
+
+function startGame() {
+  const custom = document.getElementById("custom-min").value;
+  if (custom) selectedMinutes = parseInt(custom)||10;
+  currentPlayer = document.getElementById("player-name").value.trim() || "Anonyme";
+  totalTime = selectedMinutes * 60;
+  timeLeft = totalTime;
+  found = new Set();
+  gameActive = true;
+  activeCountries = selectedRegion === "world" ? COUNTRIES : COUNTRIES.filter(c => c.r === selectedRegion);
+
+  document.getElementById("found-count").textContent = "0";
+  document.getElementById("total-count").textContent = activeCountries.length;
+  document.getElementById("timer-val").textContent = formatTime(timeLeft);
+  document.getElementById("timer-val").className = "stat-val";
+  document.getElementById("region-badge").textContent = REGIONS[selectedRegion].emoji + " " + REGIONS[selectedRegion].label;
+  document.getElementById("progress-fill").style.width = "0%";
+
+  buildMap();
+  document.getElementById("setup-screen").classList.add("hidden");
+  document.getElementById("end-screen").classList.add("hidden");
+  document.getElementById("input-box").value = "";
+  document.getElementById("input-box").focus();
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    const tv = document.getElementById("timer-val");
+    tv.textContent = formatTime(timeLeft);
+    tv.className = "stat-val" + (timeLeft <= 30 ? " urgent" : "");
+    updateProgress();
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+}
+
+function formatTime(s) {
+  return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
+}
+function updateProgress() {
+  document.getElementById("progress-fill").style.width = (found.size / activeCountries.length * 100) + "%";
+}
+
+document.getElementById("input-box").addEventListener("input", function() {
+  if (!gameActive) return;
+  const val = normalize(this.value);
+  if (val.length < 2) return;
+  for (const c of activeCountries) {
+    if (found.has(c.id)) continue;
+    for (const name of c.names) {
+      if (normalize(name) === val) {
+        found.add(c.id);
+        markFound(c.id);
+        document.getElementById("found-count").textContent = found.size;
+        updateProgress();
+        this.value = "";
+        this.classList.add("correct");
+        setTimeout(() => this.classList.remove("correct"), 400);
+        if (found.size === activeCountries.length) endGame(true);
+        return;
+      }
+    }
+  }
+});
+
+function endGame(perfect=false) {
+  clearInterval(timerInterval);
+  gameActive = false;
+  document.getElementById("tooltip").classList.add("hidden");
+
+  addScore(currentPlayer, selectedRegion, found.size, activeCountries.length, selectedMinutes);
+
+  const pct = Math.round(found.size / activeCountries.length * 100);
+  document.getElementById("end-title").textContent = perfect ? "🎉 Parfait !" : "⏱ Temps écoulé !";
+  document.getElementById("score-big").textContent = found.size + " / " + activeCountries.length;
+  document.getElementById("score-sub").textContent = `${pct}% — ${currentPlayer} — ${REGIONS[selectedRegion].label} — ${selectedMinutes} min`;
+
+  const fl = document.getElementById("found-list");
+  fl.innerHTML = "";
+  [...found].forEach(id => {
+    const c = activeCountries.find(x => x.id === id);
+    const span = document.createElement("span");
+    span.className = "found-tag";
+    span.textContent = c.names[0];
+    fl.appendChild(span);
+  });
+
+  const ml = document.getElementById("missed-wrap");
+  ml.innerHTML = `<h3>Pays non trouvés (${activeCountries.length - found.size})</h3>`;
+  activeCountries.filter(c => !found.has(c.id)).forEach(c => {
+    const path = document.getElementById("path-"+c.id);
+    if (path) { path.setAttribute("fill","rgba(255,59,48,0.3)"); path.setAttribute("stroke","rgba(255,59,48,0.6)"); }
+    const div = document.createElement("div");
+    div.className = "missed-item";
+    div.textContent = c.names[0];
+    ml.appendChild(div);
+  });
+
+  document.getElementById("end-screen").classList.remove("hidden");
+}
+
+function giveUp() { if (gameActive) endGame(); }
+function showSetup() {
+  clearInterval(timerInterval); gameActive = false;
+  buildRegionGrid();
+  document.getElementById("end-screen").classList.add("hidden");
+  document.getElementById("lb-screen").classList.add("hidden");
+  document.getElementById("setup-screen").classList.remove("hidden");
+}
+function restartSame() {
+  document.getElementById("end-screen").classList.add("hidden");
+  startGame();
+}
+
+// ══════════════════════════════════════════════════════════
+// LEADERBOARD
+// ══════════════════════════════════════════════════════════
+function showLeaderboard() {
+  lbRegionFilter = selectedRegion || "world";
+  renderLB();
+  document.getElementById("setup-screen").classList.add("hidden");
+  document.getElementById("end-screen").classList.add("hidden");
+  document.getElementById("lb-screen").classList.remove("hidden");
+}
+
+function hideLB() {
+  document.getElementById("lb-screen").classList.add("hidden");
+  if (gameActive) return;
+  document.getElementById("setup-screen").classList.remove("hidden");
+}
+
+function renderLB() {
+  // Tabs
+  const tabs = document.getElementById("lb-tabs");
+  tabs.innerHTML = "";
+  Object.entries(REGIONS).forEach(([key, r]) => {
+    const btn = document.createElement("button");
+    btn.className = "lb-tab" + (key === lbRegionFilter ? " active" : "");
+    btn.textContent = r.emoji + " " + r.label;
+    btn.onclick = () => { lbRegionFilter = key; renderLB(); };
+    tabs.appendChild(btn);
+  });
+
+  const lb = loadLB();
+  const filtered = lb.filter(e => lbRegionFilter === "world" ? true : e.region === lbRegionFilter);
+  const list = document.getElementById("lb-list");
+  list.innerHTML = "";
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="lb-empty">Aucun score pour cette région encore.</div>`;
+    return;
+  }
+
+  filtered.slice(0,20).forEach((e, i) => {
+    const row = document.createElement("div");
+    row.className = "lb-row";
+    const rankClass = i===0?"r1":i===1?"r2":i===2?"r3":"";
+    const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+    row.innerHTML = `
+      <div class="lb-rank ${rankClass}">${medal||"#"+(i+1)}</div>
+      <div style="flex:1">
+        <div class="lb-name">${e.player}</div>
+        <div style="display:flex;gap:8px;margin-top:2px">
+          <span class="lb-region">${REGIONS[e.region]?.emoji||""} ${REGIONS[e.region]?.label||e.region}</span>
+          <span class="lb-time">${e.minutes} min · ${e.date}</span>
+        </div>
+      </div>
+      <div>
+        <span class="lb-score">${e.score}/${e.total}</span>
+        <span class="lb-pct">${e.pct}%</span>
+      </div>`;
+    list.appendChild(row);
+  });
+}
+
+// Init
+buildMap();
+</script>
+</body>
+</html>
